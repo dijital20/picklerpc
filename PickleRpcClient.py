@@ -7,14 +7,7 @@ import logging
 import pickle
 import socket
 
-
-def _socket(*args, **kwargs):
-    """Get a socket.socket implementation that closes."""
-    if hasattr(socket.socket, '__exit__'):
-        return socket.socket(*args, **kwargs)
-    else:
-        from contextlib import closing
-        return closing(socket.socket(*args, **kwargs))
+from contextlib import closing
 
 
 class PickleRpcClient(object):
@@ -96,7 +89,7 @@ class PickleRpcClient(object):
         ))
         payload = {'command': command, 'args': args, 'kwargs': kwargs}
         payload = pickle.dumps(payload)
-        with _socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             self._log.debug('Connecting to {}:{}'.format(
                 self.cli_server, self.cli_port))
             s.connect((self.cli_server, self.cli_port))
