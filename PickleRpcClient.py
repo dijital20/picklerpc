@@ -38,10 +38,10 @@ class PickleRpcClient(object):
         methods = self._send_command('_ext_methods')
         for method, docstring in methods:
             if method in dir(self):
-                self._log.warning('Member exists: {}'.format(method))
-                continue
-            self._log.debug('Creating method: {}'.format(method))
-            setattr(self, method, self._method_call(method, docstring))
+                self._log.warning('Method exists: {}'.format(method))
+            else:
+                self._log.debug('Creating method: {}'.format(method))
+                setattr(self, method, self._method_call(method, docstring))
 
     def _method_call(self, method_name, docstring=''):
         """
@@ -59,7 +59,8 @@ class PickleRpcClient(object):
         def wrapped_method(*args, **kwargs):
             return self._send_command(method_name, *args, **kwargs)
 
-        wrapped_method.__doc__ = docstring
+        if docstring:
+            wrapped_method.__doc__ = docstring
         return wrapped_method
 
     def _send_command(self, command, *args, **kwargs):
