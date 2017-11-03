@@ -16,8 +16,7 @@ def time_from_now(**kwargs):
     Return a datetime object from the future!!
 
     Args:
-        **kwargs (dict): Keyword arguments, which will be passed to
-            timedelta().
+        **kwargs: Keyword arguments, which will be passed to timedelta().
 
     Returns (datetime):
         Datetime object from the specified point in the future. No Delorean
@@ -63,8 +62,7 @@ class PickleRpcServer(object):
         """Dictionary of non-protected properties."""
         return {
             k: getattr(self, k) for k in dir(self)
-            if not k.startswith('_')
-               and not callable(getattr(self, k))
+            if not k.startswith('_') and not callable(getattr(self, k))
         }
 
     @property
@@ -122,18 +120,23 @@ class PickleRpcServer(object):
                 run indefinitely).
         """
         self._log.debug(locals())
+        # Set the stopper.
         if timeout:
             stop_time = time_from_now(seconds=timeout)
             self._log.info('Running until {}'.format(stop_time))
-            stopper = lambda: bool(datetime.datetime.now() < stop_time)
+            def stopper():
+                return bool(datetime.datetime.now() < stop_time)
         else:
             self._log.info('Running indefinitely')
-            stopper = lambda: False
+            def stopper():
+                return False
+        # Open the socket for use.
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.settimeout(5)
             self._log.info('Starting listening on {}:{}'.format(
                 self.svr_host, self.svr_port))
             s.bind((self.svr_host, self.svr_port))
+            # Loop
             while stopper():
                 try:
                     try:
@@ -151,8 +154,10 @@ class PickleRpcServer(object):
                             retval = pickle.dumps(val)
                             self._log.debug('Sending: {}'.format(repr(retval)))
                             c.sendall(retval)
+                    except socket.timeout:
+                        pass
                     except socket.error as e:
-                        self._log.debug('Received nothing ({}).'.format(e))
+                        self._log.error('ERROR: {}'.format(e))
                 except KeyboardInterrupt:
                     self._log.debug('Stopping.')
                     break
