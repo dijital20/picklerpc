@@ -55,7 +55,7 @@ class PickleRpcServer(object):
     @property
     def _log(self):
         """Logger."""
-        return logging.getLogger('picklerpc.PickleRpcServer')
+        return logging.getLogger('picklerpc.{}'.format(self.__class__.__name__))
 
     @property
     def _dict(self):
@@ -98,14 +98,14 @@ class PickleRpcServer(object):
                     self._log.debug('Method found: {}'.format(command))
                     return getattr(self, command)(*args, **kwargs)
                 except Exception as e:
-                    self._log.error('Got error: {}'.format(e))
+                    self._log.error('ERROR occurred calling method', exc_info=True)
                     return e
             else:
                 try:
                     self._log.debug('Property found: {}'.format(command))
                     return getattr(self, command)
                 except Exception as e:
-                    self._log.error('Got error: {}'.format(e))
+                    self._log.error('ERROR getting property', exc_info=True)
                     return e
         else:
             self._log.debug('Not found: {}'.format(command))
@@ -123,18 +123,19 @@ class PickleRpcServer(object):
         # Set the stopper.
         if timeout:
             stop_time = time_from_now(seconds=timeout)
-            self._log.info('Running until {}'.format(stop_time))
+            self._log.info('Running until %s', stop_time)
             def stopper():
+                """Stop when I tell you to."""
                 return bool(datetime.datetime.now() < stop_time)
         else:
             self._log.info('Running indefinitely')
             def stopper():
+                """Don't stop"""
                 return False
         # Open the socket for use.
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.settimeout(5)
-            self._log.info('Starting listening on {}:{}'.format(
-                self.svr_host, self.svr_port))
+            self._log.info('Starting listening on %s:%i', self.svr_host, self.svr_port)
             s.bind((self.svr_host, self.svr_port))
             # Loop
             while stopper():
@@ -142,32 +143,30 @@ class PickleRpcServer(object):
                     try:
                         r = s.listen(0)
                         c, a = s.accept()
-                        self._log.debug('Received from: {}'.format(a))
+                        self._log.debug('Received from: %s', a)
                         with closing(c):
                             data = c.recv(4096)
-                            self._log.debug('Received data: {}'.format(repr(data)))
+                            self._log.debug('Received data: %s', repr(data))
                             payload = pickle.loads(data)
                             self._log.info('Received: {}'.format(payload))
                             val = self._get_result(**payload)
-                            self._log.debug('Packaging {} for return: {}'.format(
-                                type(val), repr(val)))
+                            self._log.debug('Packaging %s for return: %s', type(val), repr(val))
                             retval = pickle.dumps(val)
-                            self._log.debug('Sending: {}'.format(repr(retval)))
+                            self._log.debug('Sending: %s', repr(retval))
                             c.sendall(retval)
                     except socket.timeout:
                         pass
-                    except socket.error as e:
-                        self._log.error('ERROR: {}'.format(e))
+                    except socket.error:
+                        self._log.error('ERROR getting or sending data.', exc_info=True)
                 except KeyboardInterrupt:
                     self._log.debug('Stopping.')
                     break
-            self._log.info('Stopped listening on {}:{}'.format(
-                self.svr_host, self.svr_port))
+            self._log.info('Stopped listening on %s:%i', self.svr_host, self.svr_port)
 
 
 if __name__ == '__main__':
     # Init logging
-    log = logging.basicConfig(
+    logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s %(name)s.%(funcName)s %(msg)s',
     )

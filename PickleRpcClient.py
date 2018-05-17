@@ -38,9 +38,9 @@ class PickleRpcClient(object):
         methods = self._send_command('_ext_methods')
         for method, docstring in methods:
             if method in dir(self):
-                self._log.warning('Method exists: {}'.format(method))
+                self._log.warning('Method exists: %s', method)
             else:
-                self._log.debug('Creating method: {}'.format(method))
+                self._log.debug('Creating method: %s', method)
                 setattr(self, method, self._method_call(method, docstring))
 
     def _method_call(self, method_name, docstring=''):
@@ -79,7 +79,8 @@ class PickleRpcClient(object):
             Exception: If the method returned an exception object, raise it.
         """
         self._log.debug(locals())
-        self._log.debug('Remote calling {}({}) on {}:{}'.format(
+        self._log.debug(
+            'Remote calling %s(%s) on %s:%i', 
             command,
             ', '.join(
                 list(args) +
@@ -87,21 +88,20 @@ class PickleRpcClient(object):
             ),
             self.cli_server,
             self.cli_port,
-        ))
+        )
         payload = {'command': command, 'args': args, 'kwargs': kwargs}
         payload = pickle.dumps(payload)
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            self._log.debug('Connecting to {}:{}'.format(
-                self.cli_server, self.cli_port))
+            self._log.debug('Connecting to %s:%i', self.cli_server, self.cli_port)
             s.connect((self.cli_server, self.cli_port))
             send_cmd = payload
-            self._log.debug('Sending: {}'.format(send_cmd))
+            self._log.debug('Sending: %s', send_cmd)
             s.sendall(send_cmd)
             data = s.recv(4096)
-            self._log.debug('Received: {}'.format(data))
+            self._log.debug('Received: %s', data)
         # Process the data
         o_data = pickle.loads(data)
-        self._log.debug('Loaded {}: {}'.format(type(o_data), repr(o_data)))
+        self._log.debug('Loaded %s: %s', type(o_data), repr(o_data))
         if isinstance(o_data, Exception):
             raise o_data
         return o_data
@@ -118,8 +118,10 @@ if __name__ == '__main__':
     c = PickleRpcClient('127.0.0.1', 62000)
     # Print the method name and docstring of each method.
     for item in [m for m in dir(c) if not m.startswith('_')]:
-        logging.info('{}\nMethod: {}()\n\n{}\n'.format(
-            '-' * 80, item, getattr(c, item).__doc__))
+        logging.info(
+            '%s\nMethod: %s()\n\n%s\n', 
+            '-' * 80, item, getattr(c, item).__doc__
+        )
     # Call the ping() method and print its output.
     logging.info(c.ping())
     # Call the raise_exception method.
