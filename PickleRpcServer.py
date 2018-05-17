@@ -74,8 +74,8 @@ class PickleRpcServer(object):
         return [
             (i, getattr(self, i).__doc__) for i in dir(self)
             if i not in ['run']
-               and not i.startswith('_')
-               and callable(getattr(self, i))
+            and not i.startswith('_')
+            and callable(getattr(self, i))
         ]
 
     def _get_result(self, command=None, args=None, kwargs=None):
@@ -95,20 +95,20 @@ class PickleRpcServer(object):
         if hasattr(self, command):
             if callable(getattr(self, command)):
                 try:
-                    self._log.debug('Method found: {}'.format(command))
+                    self._log.debug('Method found: %s', command)
                     return getattr(self, command)(*args, **kwargs)
-                except Exception as e:
+                except Exception as error:
                     self._log.error('ERROR occurred calling method', exc_info=True)
-                    return e
+                    return error
             else:
                 try:
-                    self._log.debug('Property found: {}'.format(command))
+                    self._log.debug('Property found: %s', command)
                     return getattr(self, command)
-                except Exception as e:
+                except Exception as error:
                     self._log.error('ERROR getting property', exc_info=True)
-                    return e
+                    return error
         else:
-            self._log.debug('Not found: {}'.format(command))
+            self._log.debug('Not found: %s', command)
             return AttributeError('Unable to find member: {}'.format(command))
 
     def run(self, timeout=None):
@@ -133,27 +133,27 @@ class PickleRpcServer(object):
                 """Don't stop"""
                 return False
         # Open the socket for use.
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.settimeout(5)
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            sock.settimeout(5)
             self._log.info('Starting listening on %s:%i', self.svr_host, self.svr_port)
-            s.bind((self.svr_host, self.svr_port))
+            sock.bind((self.svr_host, self.svr_port))
             # Loop
             while stopper():
                 try:
                     try:
-                        r = s.listen(0)
-                        c, a = s.accept()
-                        self._log.debug('Received from: %s', a)
-                        with closing(c):
-                            data = c.recv(4096)
+                        sock.listen(0)
+                        conn, addr = sock.accept()
+                        self._log.debug('Received from: %s', addr)
+                        with closing(conn):
+                            data = conn.recv(4096)
                             self._log.debug('Received data: %s', repr(data))
                             payload = pickle.loads(data)
-                            self._log.info('Received: {}'.format(payload))
+                            self._log.info('Received: %s', payload)
                             val = self._get_result(**payload)
                             self._log.debug('Packaging %s for return: %s', type(val), repr(val))
                             retval = pickle.dumps(val)
                             self._log.debug('Sending: %s', repr(retval))
-                            c.sendall(retval)
+                            conn.sendall(retval)
                     except socket.timeout:
                         pass
                     except socket.error:
@@ -173,6 +173,7 @@ if __name__ == '__main__':
 
     # Create a new subclass with a ping method.
     class Pinger(PickleRpcServer):
+        """Example class"""
         def __init__(self):
             """Prepare a Pinger for use."""
             super(Pinger, self).__init__()
@@ -188,5 +189,5 @@ if __name__ == '__main__':
 
     # Start the server and run it for 2 minutes.
     j = Pinger()
-    logging.info('\n' + str(j))
+    logging.info('\n%s', j)
     j.run(timeout=120)
