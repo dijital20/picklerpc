@@ -12,6 +12,7 @@ from contextlib import closing
 
 class PickleRpcClient(object):
     """A client for PickleRpcServer. Use the client to connect to a server."""
+
     def __init__(self, server, port):
         """
         Prepare a PickleRpcClient instance for use.
@@ -56,11 +57,12 @@ class PickleRpcClient(object):
         Returns (func):
             Wrapped method.
         """
+
         def wrapped_method(*args, **kwargs):
+            """The remote method. This docstring will be replaced."""
             return self._send_command(method_name, *args, **kwargs)
 
-        if docstring:
-            wrapped_method.__doc__ = docstring
+        wrapped_method.__doc__ = docstring
         return wrapped_method
 
     def _send_command(self, command, *args, **kwargs):
@@ -80,24 +82,23 @@ class PickleRpcClient(object):
         """
         self._log.debug(locals())
         self._log.debug(
-            'Remote calling %s(%s) on %s:%i', 
+            'Remote calling %s(%s) on %s:%i',
             command,
             ', '.join(
-                list(args) +
-                ['{}={}'.format(k, v) for k, v in kwargs.items()]
-            ),
+                list(args) + ['{}={}'.format(k, v) for k, v in kwargs.items()]),
             self.cli_server,
             self.cli_port,
         )
         payload = {'command': command, 'args': args, 'kwargs': kwargs}
         payload = pickle.dumps(payload)
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            self._log.debug('Connecting to %s:%i', self.cli_server, self.cli_port)
-            s.connect((self.cli_server, self.cli_port))
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            self._log.debug('Connecting to %s:%i', self.cli_server,
+                            self.cli_port)
+            sock.connect((self.cli_server, self.cli_port))
             send_cmd = payload
             self._log.debug('Sending: %s', send_cmd)
-            s.sendall(send_cmd)
-            data = s.recv(4096)
+            sock.sendall(send_cmd)
+            data = sock.recv(4096)
             self._log.debug('Received: %s', data)
         # Process the data
         o_data = pickle.loads(data)
@@ -109,22 +110,17 @@ class PickleRpcClient(object):
 
 if __name__ == '__main__':
     # Setup logging.
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(msg)s'
-    )
+    logging.basicConfig(level=logging.INFO, format='%(msg)s')
 
     # Setup client.
-    c = PickleRpcClient('127.0.0.1', 62000)
+    client = PickleRpcClient('127.0.0.1', 62000)
     # Print the method name and docstring of each method.
-    for item in [m for m in dir(c) if not m.startswith('_')]:
-        logging.info(
-            '%s\nMethod: %s()\n\n%s\n', 
-            '-' * 80, item, getattr(c, item).__doc__
-        )
+    for item in [m for m in dir(client) if not m.startswith('_')]:
+        logging.info('%s\nMethod: %s()\n\n%s\n', '-' * 80, item,
+                     getattr(client, item).__doc__)
     # Call the ping() method and print its output.
-    logging.info(c.ping())
+    logging.info(client.ping())
     # Call the raise_exception method.
-    logging.info(c.raise_exception())
+    logging.info(client.raise_exception())
     # Call the pong() method (which shouldn't exist...)
-    logging.info(c.pong())
+    logging.info(client.pong())
