@@ -59,7 +59,7 @@ class PickleRpcClient:
         Returns (func):
             Wrapped method.
         """
-        wrapped_method = lambda *args, **kwargs: self._send_command(method_name, *args, **kwargs) 
+        wrapped_method = lambda *args, **kwargs: self._send_command(method_name, *args, **kwargs)
         wrapped_method.__doc__ = docstring
         return wrapped_method
 
@@ -82,16 +82,16 @@ class PickleRpcClient:
         self._log.debug(
             'Remote calling %s(%s) on %s:%i',
             command,
-            ', '.join(
-                [repr(a) for a in args] + ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()]
-            ),
+            ', '.join([repr(a) for a in args] +
+                      ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()]),
             self.cli_server,
             self.cli_port,
         )
         payload = {'command': command, 'args': args, 'kwargs': kwargs}
         payload = pickle.dumps(payload, protocol=self.cli_protocol)
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            self._log.debug('Connecting to %s:%i', self.cli_server, self.cli_port)
+            self._log.debug('Connecting to %s:%i', self.cli_server,
+                            self.cli_port)
             sock.connect((self.cli_server, self.cli_port))
             send_cmd = payload
             self._log.debug('Sending:\n\n%r\n', send_cmd)
@@ -110,9 +110,8 @@ class PickleRpcClient:
 if __name__ == '__main__':
     # Setup logging.
     logging.basicConfig(
-        level=logging.DEBUG, 
-        format='%(asctime)s %(name)s.%(funcName)s %(message)s'
-    )
+        level=logging.DEBUG,
+        format='%(asctime)s %(name)s.%(funcName)s %(message)s')
 
     # Setup client.
     client = PickleRpcClient('127.0.0.1', 62000, protocol=2)
