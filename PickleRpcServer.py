@@ -3,32 +3,19 @@ picklerpc Server
 Author: Josh Schneider (josh.schneider@gmail.com)
 """
 
-import datetime
 import logging
 import pickle
 import socket
+import time
+import traceback
 
 from contextlib import closing
 
 
-def time_from_now(**kwargs):
-    """
-    Return a datetime object from the future!!
-
-    Args:
-        **kwargs: Keyword arguments, which will be passed to timedelta().
-
-    Returns (datetime):
-        Datetime object from the specified point in the future. No Delorean
-        needed.
-    """
-    return datetime.datetime.now() + datetime.timedelta(**kwargs)
-
-
-class PickleRpcServer(object):
+class PickleRpcServer:
     """Pickle RPC Server. Subclass, add your own methods, and watch it go!"""
 
-    def __init__(self, host='', port=62000):
+    def __init__(self, host='0.0.0.0', port=62000, protocol=None):
         """
         Prepare a PickleRpcServer instance for use.
 
@@ -41,6 +28,7 @@ class PickleRpcServer(object):
         self.svr_fqdn = socket.getfqdn()
         self.svr_host = host
         self.svr_port = int(port)
+        self.svr_protocol = protocol
         self._log.debug('Initialized.')
 
     def __str__(self):
@@ -72,10 +60,13 @@ class PickleRpcServer(object):
         List of methods that should be externally accessible (public, and not
         run()).
         """
-        return [(i, getattr(self, i).__doc__)
-                for i in dir(self)
-                if i not in ['run'] and not i.startswith('_') and
-                callable(getattr(self, i))]
+        return [
+            (i, getattr(self, i).__doc__)
+            for i in dir(self)
+            if i not in ['run'] 
+            and not i.startswith('_') 
+            and callable(getattr(self, i))
+        ]
 
     def _get_result(self, command=None, args=None, kwargs=None):
         """
@@ -90,26 +81,18 @@ class PickleRpcServer(object):
             Returns whatever the method returns, or an exception object if an
             exception occurs.
         """
-        self._log.debug(locals())
-        if hasattr(self, command):
-            if callable(getattr(self, command)):
-                try:
-                    self._log.debug('Method found: %s', command)
-                    return getattr(self, command)(*args, **kwargs)
-                except Exception as error:
-                    self._log.error(
-                        'ERROR occurred calling method', exc_info=True)
-                    return error
-            else:
-                try:
-                    self._log.debug('Property found: %s', command)
-                    return getattr(self, command)
-                except Exception as error:
-                    self._log.error('ERROR getting property', exc_info=True)
-                    return error
-        else:
-            self._log.debug('Not found: %s', command)
-            return AttributeError('Unable to find member: {}'.format(command))
+        self._log.info(
+            'Getting: %s(%s)', 
+            command, 
+            ', '.join([repr(a) for a in args] + ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()])
+        )
+        try:
+            member = getattr(self, command)
+            return member(*args, **kwargs) if callable(member) else member
+        except Exception as error:
+            self._log.error('ERROR getting attribute %s', command, exc_info=True)
+            return error
+
 
     def run(self, timeout=None):
         """
@@ -120,26 +103,15 @@ class PickleRpcServer(object):
                 run indefinitely).
         """
         self._log.debug(locals())
+        
         # Set the stopper.
-        if timeout:
-            stop_time = time_from_now(seconds=timeout)
-            self._log.info('Running until %s', stop_time)
-
-            def stopper():
-                """Stop when I tell you to."""
-                return bool(datetime.datetime.now() < stop_time)
-        else:
-            self._log.info('Running indefinitely')
-
-            def stopper():
-                """Don't stop"""
-                return False
+        stop_time = time.time() + timeout if timeout else None
+        stopper = lambda : bool(time.time() < stop_time) if timeout else False
 
         # Open the socket for use.
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             sock.settimeout(5)
-            self._log.info('Starting listening on %s:%i', self.svr_host,
-                           self.svr_port)
+            self._log.info('Listening on %s:%i', self.svr_host, self.svr_port)
             sock.bind((self.svr_host, self.svr_port))
             # Loop
             while stopper():
@@ -147,17 +119,16 @@ class PickleRpcServer(object):
                     try:
                         sock.listen(0)
                         conn, addr = sock.accept()
-                        self._log.debug('Received from: %s', addr)
+                        self._log.debug('--- Got something ---')
                         with closing(conn):
                             data = conn.recv(4096)
-                            self._log.debug('Received data: %s', repr(data))
+                            self._log.debug('Received data from %s:\n\n%r\n', addr, data)
                             payload = pickle.loads(data)
-                            self._log.info('Received: %s', payload)
+                            self._log.debug('Received %r', payload)
                             val = self._get_result(**payload)
-                            self._log.debug('Packaging %s for return: %s',
-                                            type(val), repr(val))
-                            retval = pickle.dumps(val)
-                            self._log.debug('Sending: %s', repr(retval))
+                            self._log.debug('Packaging %s for return', type(val))
+                            retval = pickle.dumps(val, protocol=self.svr_protocol)
+                            self._log.debug('Sending:\n\n%r\n', retval)
                             conn.sendall(retval)
                     except socket.timeout:
                         pass
@@ -174,28 +145,65 @@ class PickleRpcServer(object):
 if __name__ == '__main__':
     # Init logging
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(name)s.%(funcName)s %(msg)s',
+        level=logging.DEBUG,
+        format='%(asctime)s %(name)s.%(funcName)s %(message)s'
     )
 
     # Create a new subclass with a ping method.
     class Pinger(PickleRpcServer):
         """Example class"""
 
-        def __init__(self):
+        def __init__(self, *args, **kwargs):
             """Prepare a Pinger for use."""
-            super(Pinger, self).__init__()
+            super(Pinger, self).__init__(*args, **kwargs)
             self.name = 'foo'
 
         def ping(self):
-            """Returns PONG, and just for testing."""
+            """
+            Returns PONG, and just for testing.
+
+            Returns (str):
+                PONG.
+            """
             return 'PONG'
 
+        def echo(self, message):
+            """
+            Responds back to the caller.
+
+            Args:
+                message (str): Message to receive.
+            
+            Returns (str):
+                Response.
+            """
+            self._log.debug('Hey, we got a message: %r', message)
+            return 'I received: {}'.format(message)
+
+        def story(self, food='cheese', effect='moldy'):
+            """
+            Responds back to the caller with food.
+
+            Args:
+                food (str): Food to work with.
+                effect (str): What food does.
+
+            Returns (str):
+                Response.
+            """
+            self._log.debug('We got food=%s and effect=%s', food, effect)
+            return 'The {} is {}'.format(food, effect)
+
         def raise_exception(self):
-            """Just raises an exception."""
+            """
+            Just raises an exception.
+
+            Raises:
+                NotImplementedError: Just because.
+            """
             raise NotImplementedError('Foo!')
 
     # Start the server and run it for 2 minutes.
-    j = Pinger()
+    j = Pinger(protocol=2)
     logging.info('\n%s', j)
     j.run(timeout=120)

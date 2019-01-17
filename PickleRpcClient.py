@@ -10,10 +10,10 @@ import socket
 from contextlib import closing
 
 
-class PickleRpcClient(object):
+class PickleRpcClient:
     """A client for PickleRpcServer. Use the client to connect to a server."""
 
-    def __init__(self, server, port):
+    def __init__(self, server, port, protocol=None):
         """
         Prepare a PickleRpcClient instance for use.
 
@@ -24,6 +24,7 @@ class PickleRpcClient(object):
         self._log.debug(locals())
         self.cli_server = server
         self.cli_port = port
+        self.cli_protocol = protocol
         # Create socket
         self._setup_obj()
 
@@ -39,7 +40,7 @@ class PickleRpcClient(object):
         methods = self._send_command('_ext_methods')
         for method, docstring in methods:
             if method in dir(self):
-                self._log.warning('Method exists: %s', method)
+                self._log.warning('Method already exists: %s', method)
             else:
                 self._log.debug('Creating method: %s', method)
                 setattr(self, method, self._method_call(method, docstring))
@@ -53,15 +54,12 @@ class PickleRpcClient(object):
             method_name (str): Name of the method.
             docstring (str): Docstring of the remote method. Defaults to
                 empty string.
+            called (bool): Is this a callable method or a property?
 
         Returns (func):
             Wrapped method.
         """
-
-        def wrapped_method(*args, **kwargs):
-            """The remote method. This docstring will be replaced."""
-            return self._send_command(method_name, *args, **kwargs)
-
+        wrapped_method = lambda *args, **kwargs: self._send_command(method_name, *args, **kwargs) 
         wrapped_method.__doc__ = docstring
         return wrapped_method
 
@@ -85,24 +83,25 @@ class PickleRpcClient(object):
             'Remote calling %s(%s) on %s:%i',
             command,
             ', '.join(
-                list(args) + ['{}={}'.format(k, v) for k, v in kwargs.items()]),
+                [repr(a) for a in args] + ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()]
+            ),
             self.cli_server,
             self.cli_port,
         )
         payload = {'command': command, 'args': args, 'kwargs': kwargs}
-        payload = pickle.dumps(payload)
+        payload = pickle.dumps(payload, protocol=self.cli_protocol)
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            self._log.debug('Connecting to %s:%i', self.cli_server,
-                            self.cli_port)
+            self._log.debug('Connecting to %s:%i', self.cli_server, self.cli_port)
             sock.connect((self.cli_server, self.cli_port))
             send_cmd = payload
-            self._log.debug('Sending: %s', send_cmd)
+            self._log.debug('Sending:\n\n%r\n', send_cmd)
             sock.sendall(send_cmd)
             data = sock.recv(4096)
-            self._log.debug('Received: %s', data)
+            self._log.debug('Received:\n\n%r\n', data)
         # Process the data
         o_data = pickle.loads(data)
-        self._log.debug('Loaded %s: %s', type(o_data), repr(o_data))
+        self._log.debug('Loaded %s: %r', type(o_data), o_data)
+        # Raise if this is an exception.
         if isinstance(o_data, Exception):
             raise o_data
         return o_data
@@ -110,17 +109,41 @@ class PickleRpcClient(object):
 
 if __name__ == '__main__':
     # Setup logging.
-    logging.basicConfig(level=logging.INFO, format='%(msg)s')
+    logging.basicConfig(
+        level=logging.DEBUG, 
+        format='%(asctime)s %(name)s.%(funcName)s %(message)s'
+    )
 
     # Setup client.
-    client = PickleRpcClient('127.0.0.1', 62000)
+    client = PickleRpcClient('127.0.0.1', 62000, protocol=2)
     # Print the method name and docstring of each method.
     for item in [m for m in dir(client) if not m.startswith('_')]:
         logging.info('%s\nMethod: %s()\n\n%s\n', '-' * 80, item,
                      getattr(client, item).__doc__)
     # Call the ping() method and print its output.
+    logging.info('ping()')
     logging.info(client.ping())
+    # Call the echo() method and print its output.
+    logging.info('echo()')
+    logging.info(client.echo('Marco'))
+    # Call story() with keyword arguments.add()
+    logging.info('story()')
+    logging.info(client.story(effect='delicious', food='cake'))
     # Call the raise_exception method.
-    logging.info(client.raise_exception())
+    logging.info('raise_exception()')
+    try:
+        logging.info(client.raise_exception())
+    except Exception:
+        logging.info('Got an exception', exc_info=True)
     # Call the pong() method (which shouldn't exist...)
-    logging.info(client.pong())
+    logging.info('pong()')
+    try:
+        logging.info(client.parrot())
+    except Exception:
+        logging.info('Got an exception', exc_info=True)
+    # Try explicitly calling pong() on the other end.add()
+    logging.info('pong() [via _send_command()]')
+    try:
+        client._send_command('parrot')
+    except Exception:
+        logging.info('Got an exception', exc_info=True)
