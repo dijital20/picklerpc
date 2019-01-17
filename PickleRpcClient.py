@@ -119,27 +119,33 @@ if __name__ == '__main__':
     for item in [m for m in dir(client) if not m.startswith('_')]:
         logging.info('%s\nMethod: %s()\n\n%s\n', '-' * 80, item,
                      getattr(client, item).__doc__)
+    
     # Call the ping() method and print its output.
     logging.info('ping()')
     logging.info(client.ping())
+    
     # Call the echo() method and print its output.
     logging.info('echo()')
     logging.info(client.echo('Marco'))
+    
     # Call story() with keyword arguments.add()
     logging.info('story()')
     logging.info(client.story(effect='delicious', food='cake'))
+    
     # Call the raise_exception method.
     logging.info('raise_exception()')
     try:
         logging.info(client.raise_exception())
     except Exception:
         logging.info('Got an exception', exc_info=True)
+    
     # Call the pong() method (which shouldn't exist...)
     logging.info('pong()')
     try:
         logging.info(client.parrot())
     except Exception:
         logging.info('Got an exception', exc_info=True)
+    
     # Try explicitly calling pong() on the other end.add()
     logging.info('pong() [via _send_command()]')
     try:
