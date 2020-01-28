@@ -7,7 +7,6 @@ import logging
 import pickle
 import socket
 import time
-import traceback
 
 from contextlib import closing
 
@@ -24,12 +23,12 @@ class PickleRpcServer:
                 hosts).
             port (int): Port to bind to. Defaults to 62000.
         """
-        self._log.debug(locals())
+        self._log = logging.getLogger('picklerpc.{}'.format(self.__class__.__name__))
         self.svr_fqdn = socket.getfqdn()
         self.svr_host = host
         self.svr_port = int(port)
         self.svr_protocol = protocol
-        self._log.debug('Initialized.')
+        self.svr_running = False
 
     def __str__(self):
         """Displays detailed information with str()."""
@@ -39,11 +38,6 @@ class PickleRpcServer:
                 ['  {:10}: {}'.format(k, v) for k, v in self._dict.items()]),
             '\n'.join('  {}'.format(m) for m in self._ext_methods),
         )
-
-    @property
-    def _log(self):
-        """Logger."""
-        return logging.getLogger('picklerpc.{}'.format(self.__class__.__name__))
 
     @property
     def _dict(self):
@@ -60,10 +54,11 @@ class PickleRpcServer:
         List of methods that should be externally accessible (public, and not
         run()).
         """
-        return [(i, getattr(self, i).__doc__)
-                for i in dir(self)
-                if i not in ['run'] and not i.startswith('_') and
-                callable(getattr(self, i))]
+        return [
+            (i, getattr(self, i).__doc__)
+            for i in dir(self)
+            if i not in ['run'] and not i.startswith('_') and callable(getattr(self, i))
+        ]
 
     def _get_result(self, command=None, args=None, kwargs=None):
         """
@@ -80,8 +75,10 @@ class PickleRpcServer:
         """
         self._log.info(
             'Getting: %s(%s)', command,
-            ', '.join([repr(a) for a in args] +
-                      ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()]))
+            ', '.join(
+                [repr(a) for a in args] + ['{}={}'.format(k, repr(v)) for k, v in kwargs.items()]
+            )
+        )
         try:
             member = getattr(self, command)
             return member(*args, **kwargs) if callable(member) else member
@@ -98,17 +95,20 @@ class PickleRpcServer:
             timeout (int): Number of seconds to run for. Defaults to None (
                 run indefinitely).
         """
-        self._log.debug(locals())
+        self._log.debug('Running %r with timeout=%r', self, timeout)
 
         # Set the stopper.
         stop_time = time.time() + timeout if timeout else None
-        stopper = lambda: bool(time.time() < stop_time) if timeout else False
+        
+        def stopper():
+            return bool(time.time() < stop_time) if timeout else False
 
         # Open the socket for use.
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
             sock.settimeout(5)
             self._log.info('Listening on %s:%i', self.svr_host, self.svr_port)
             sock.bind((self.svr_host, self.svr_port))
+            self.svr_running = True
             # Loop
             while stopper():
                 try:
@@ -139,69 +139,4 @@ class PickleRpcServer:
                     break
             self._log.info('Stopped listening on %s:%i', self.svr_host,
                            self.svr_port)
-
-
-if __name__ == '__main__':
-    # Init logging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s %(name)s.%(funcName)s %(message)s')
-
-    # Create a new subclass with a ping method.
-    class Pinger(PickleRpcServer):
-        """Example class"""
-
-        def __init__(self, *args, **kwargs):
-            """Prepare a Pinger for use."""
-            super(Pinger, self).__init__(*args, **kwargs)
-            self.name = 'foo'
-
-        def ping(self):
-            """
-            Returns PONG, and just for testing.
-
-            Returns (str):
-                PONG.
-            """
-            return 'PONG'
-
-        def echo(self, message):
-            """
-            Responds back to the caller.
-
-            Args:
-                message (str): Message to receive.
-            
-            Returns (str):
-                Response.
-            """
-            self._log.debug('Hey, we got a message: %r', message)
-            return 'I received: {}'.format(message)
-
-        def story(self, food='cheese', effect='moldy'):
-            """
-            Responds back to the caller with food.
-
-            Args:
-                food (str): Food to work with.
-                effect (str): What food does.
-
-            Returns (str):
-                Response.
-            """
-            self._log.debug('We got food=%s and effect=%s', food, effect)
-            return 'The {} is {}'.format(food, effect)
-
-        def raise_exception(self):
-            """
-            Just raises an exception.
-
-            Raises:
-                NotImplementedError: Just because.
-            """
-            raise NotImplementedError('Foo!')
-
-    # Start the server and run it for 2 minutes.
-    j = Pinger(protocol=2)
-    logging.info('\n%s', j)
-    j.run(timeout=120)
+            self.svr_running = False
