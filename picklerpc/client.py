@@ -1,12 +1,10 @@
-"""
-picklerpc Client
-Author: Josh Schneider (josh.schneider@gmail.com)
+"""picklerpc Client
+Author: Josh Schneider (josh.schneider@gmail.com).
 """
 
 import logging
 import pickle
 import socket
-
 from contextlib import closing
 
 LOG = logging.getLogger(__name__)
@@ -15,11 +13,11 @@ LOG = logging.getLogger(__name__)
 class PickleRpcClient:
     """A client for PickleRpcServer. Use the client to connect to a server."""
 
-    def __init__(self, server, port, protocol=None):
-        """
-        Prepare a PickleRpcClient instance for use.
+    def __init__(self, server, port, protocol=None) -> None:
+        """Prepare a PickleRpcClient instance for use.
 
         Args:
+        ----
             server (str): Hostname or IP address to connect to.
             port (int): Port to connect to.
         """
@@ -43,11 +41,11 @@ class PickleRpcClient:
                 setattr(self, method, self._method_call(method, docstring))
 
     def _method_call(self, method_name, docstring=""):
-        """
-        Wrap a remote method on this object, so we can call it like we'd call
+        """Wrap a remote method on this object, so we can call it like we'd call
         it on the remote object. Sets the docstring in the process.
 
         Args:
+        ----
             method_name (str): Name of the method.
             docstring (str): Docstring of the remote method. Defaults to
                 empty string.
@@ -64,10 +62,10 @@ class PickleRpcClient:
         return wrapped_method
 
     def _send_command(self, command, *args, **kwargs):
-        """
-        Send a command to the PickleRpcServer.
+        """Send a command to the PickleRpcServer.
 
         Args:
+        ----
             command (str): Method to call.
             *args (tuple): Tuple of positional arguments.
             **kwargs (dict): Dict of keyword arguments.
@@ -76,6 +74,7 @@ class PickleRpcClient:
             Whatever value the remote method returned.
 
         Raises:
+        ------
             Exception: If the method returned an exception object, raise it.
         """
         LOG.debug(locals())
@@ -83,8 +82,7 @@ class PickleRpcClient:
             "Remote calling %s(%s) on %s:%i",
             command,
             ", ".join(
-                [repr(a) for a in args]
-                + ["{}={}".format(k, repr(v)) for k, v in kwargs.items()]
+                [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()],
             ),
             self.cli_server,
             self.cli_port,

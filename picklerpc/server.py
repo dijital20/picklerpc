@@ -1,27 +1,24 @@
-"""
-picklerpc Server
-Author: Josh Schneider (josh.schneider@gmail.com)
+"""picklerpc Server
+Author: Josh Schneider (josh.schneider@gmail.com).
 """
 
 import logging
 import pickle
 import socket
 import time
-
 from contextlib import closing
-
 
 LOG = logging.getLogger(__name__)
 
 
 class PickleRpcServer:
-    """Pickle RPC Server. Subclass, add your own methods, and watch it go!"""
+    """Pickle RPC Server. Subclass, add your own methods, and watch it go!."""
 
-    def __init__(self, host="0.0.0.0", port=62000, protocol=None):
-        """
-        Prepare a PickleRpcServer instance for use.
+    def __init__(self, host="0.0.0.0", port=62000, protocol=None) -> None:
+        """Prepare a PickleRpcServer instance for use.
 
         Args:
+        ----
             host (str): Hostname to bind to. Defaults to empty string (all
                 hosts).
             port (int): Port to bind to. Defaults to 62000.
@@ -32,12 +29,12 @@ class PickleRpcServer:
         self.svr_protocol = protocol
         self.svr_running = False
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Displays detailed information with str()."""
         return "{} Details\n{}\nExternal Methods\n{}".format(
             self.__class__.__name__,
-            "\n".join(["  {:10}: {}".format(k, v) for k, v in self._dict.items()]),
-            "\n".join("  {}".format(m) for m in self._ext_methods),
+            "\n".join([f"  {k:10}: {v}" for k, v in self._dict.items()]),
+            "\n".join(f"  {m}" for m in self._ext_methods),
         )
 
     @property
@@ -51,8 +48,7 @@ class PickleRpcServer:
 
     @property
     def _ext_methods(self):
-        """
-        List of methods that should be externally accessible (public, and not
+        """List of methods that should be externally accessible (public, and not
         run()).
         """
         return [
@@ -62,10 +58,10 @@ class PickleRpcServer:
         ]
 
     def _get_result(self, command=None, args=None, kwargs=None):
-        """
-        Get a result from a local method.
+        """Get a result from a local method.
 
         Args:
+        ----
             command (str): Method name to call.
             args (tuple): Tuple of positional arguments.
             kwargs (dict): Dict of keyword arguments.
@@ -78,8 +74,7 @@ class PickleRpcServer:
             "Getting: %s(%s)",
             command,
             ", ".join(
-                [repr(a) for a in args]
-                + ["{}={}".format(k, repr(v)) for k, v in kwargs.items()]
+                [repr(a) for a in args] + [f"{k}={v!r}" for k, v in kwargs.items()],
             ),
         )
         try:
@@ -90,10 +85,10 @@ class PickleRpcServer:
             return error
 
     def run(self, timeout=None):
-        """
-        Run the server.
+        """Run the server.
 
         Args:
+        ----
             timeout (int): Number of seconds to run for. Defaults to None (
                 run indefinitely).
         """
@@ -130,7 +125,7 @@ class PickleRpcServer:
                             conn.sendall(retval)
                     except socket.timeout:
                         pass
-                    except socket.error:
+                    except OSError:
                         LOG.error("ERROR getting or sending data.", exc_info=True)
                 except KeyboardInterrupt:
                     LOG.debug("Stopping.")

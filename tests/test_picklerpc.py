@@ -3,31 +3,30 @@ import time
 from threading import Thread
 
 import pytest
-from picklerpc import PickleRpcClient, PickleRpcServer
 
+from picklerpc import PickleRpcClient, PickleRpcServer
 
 log = logging.getLogger()
 
 
-@pytest.fixture
+@pytest.fixture()
 def client():
     return PickleRpcClient("127.0.0.1", 62000, protocol=2)
 
 
-@pytest.fixture
+@pytest.fixture()
 def server():
     # Create a new subclass with a ping method.
     class Pinger(PickleRpcServer):
-        """Example class"""
+        """Example class."""
 
-        def __init__(self, host="0.0.0.0", port=62000, protocol=None):
+        def __init__(self, host="0.0.0.0", port=62000, protocol=None) -> None:
             """Prepare a Pinger for use."""
-            super(Pinger, self).__init__(host=host, port=port, protocol=protocol)
+            super().__init__(host=host, port=port, protocol=protocol)
             self.name = "foo"
 
         def ping(self):
-            """
-            Returns PONG, and just for testing.
+            """Returns PONG, and just for testing.
 
             Returns (str):
                 PONG.
@@ -35,23 +34,23 @@ def server():
             return "PONG"
 
         def echo(self, message):
-            """
-            Responds back to the caller.
+            """Responds back to the caller.
 
             Args:
+            ----
                 message (str): Message to receive.
 
             Returns (str):
                 Response.
             """
             self._log.debug("Hey, we got a message: %r", message)
-            return "I received: {}".format(message)
+            return f"I received: {message}"
 
         def story(self, food="cheese", effect="moldy"):
-            """
-            Responds back to the caller with food.
+            """Responds back to the caller with food.
 
             Args:
+            ----
                 food (str): Food to work with.
                 effect (str): What food does.
 
@@ -59,13 +58,13 @@ def server():
                 Response.
             """
             self._log.debug("We got food=%s and effect=%s", food, effect)
-            return "The {} is {}".format(food, effect)
+            return f"The {food} is {effect}"
 
         def raise_exception(self):
-            """
-            Just raises an exception.
+            """Just raises an exception.
 
-            Raises:
+            Raises
+            ------
                 NotImplementedError: Just because.
             """
             raise NotImplementedError("Foo!")
