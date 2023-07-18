@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "picklerpc"
+version = "1.0"
+description = "A remote procedure call library that uses Pickle and TCP sockets."
+authors = ["Josh Schneider <josh.schneider@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
