@@ -1,11 +1,11 @@
-"""picklerpc Client
-Author: Josh Schneider (josh.schneider@gmail.com).
-"""
+"""Client class which can be initialized to connect to a server."""
 
 import logging
 import pickle
 import socket
+from collections.abc import Callable
 from contextlib import closing
+from typing import Any
 
 LOG = logging.getLogger(__name__)
 
@@ -13,13 +13,18 @@ LOG = logging.getLogger(__name__)
 class PickleRpcClient:
     """A client for PickleRpcServer. Use the client to connect to a server."""
 
-    def __init__(self, server, port, protocol=None) -> None:
+    def __init__(
+        self: "PickleRpcClient",
+        server: str,
+        port: int,
+        protocol: int | None = None,
+    ) -> None:
         """Prepare a PickleRpcClient instance for use.
 
         Args:
-        ----
-            server (str): Hostname or IP address to connect to.
-            port (int): Port to connect to.
+            server: Hostname or IP address to connect to.
+            port: Port to connect to.
+            protocol: Pickle protocol to use.
         """
         LOG.debug(locals())
         self.cli_server = server
@@ -28,7 +33,7 @@ class PickleRpcClient:
         # Create socket
         self._setup_obj()
 
-    def _setup_obj(self):
+    def _setup_obj(self: "PickleRpcClient") -> None:
         """Dynamically assign the methods from the server to this instance."""
         LOG.debug(locals())
         # Register remote methods
@@ -40,12 +45,14 @@ class PickleRpcClient:
                 LOG.debug("Creating method: %s", method)
                 setattr(self, method, self._method_call(method, docstring))
 
-    def _method_call(self, method_name, docstring=""):
-        """Wrap a remote method on this object, so we can call it like we'd call
-        it on the remote object. Sets the docstring in the process.
+    def _method_call(
+        self: "PickleRpcClient",
+        method_name: str,
+        docstring: str = "",
+    ) -> Callable:
+        """Wrap a remote method on this object.
 
         Args:
-        ----
             method_name (str): Name of the method.
             docstring (str): Docstring of the remote method. Defaults to
                 empty string.
@@ -55,26 +62,35 @@ class PickleRpcClient:
             Wrapped method.
         """
 
-        def wrapped_method(*args, **kwargs):
+        def wrapped_method(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+            """Call _send_command with the arguments.
+
+            Args:
+                *args: Positional args.
+                **kwargs: Keyword args.
+            """
             return self._send_command(method_name, *args, **kwargs)
 
         wrapped_method.__doc__ = docstring
         return wrapped_method
 
-    def _send_command(self, command, *args, **kwargs):
+    def _send_command(
+        self: "PickleRpcClient",
+        command: str,
+        *args: tuple[Any, ...],
+        **kwargs: dict[str, Any],
+    ) -> Any:  # noqa: ANN401
         """Send a command to the PickleRpcServer.
 
         Args:
-        ----
-            command (str): Method to call.
-            *args (tuple): Tuple of positional arguments.
-            **kwargs (dict): Dict of keyword arguments.
+            command: Method to call.
+            *args: Tuple of positional arguments.
+            **kwargs: Dict of keyword arguments.
 
-        Returns (object):
+        Returns:
             Whatever value the remote method returned.
 
         Raises:
-        ------
             Exception: If the method returned an exception object, raise it.
         """
         LOG.debug(locals())

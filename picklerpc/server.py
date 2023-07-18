@@ -1,12 +1,12 @@
-"""picklerpc Server
-Author: Josh Schneider (josh.schneider@gmail.com).
-"""
+"""Server class, which can be subclassed."""
 
 import logging
 import pickle
 import socket
 import time
+from collections.abc import Callable
 from contextlib import closing
+from typing import Any
 
 LOG = logging.getLogger(__name__)
 
@@ -14,7 +14,12 @@ LOG = logging.getLogger(__name__)
 class PickleRpcServer:
     """Pickle RPC Server. Subclass, add your own methods, and watch it go!."""
 
-    def __init__(self, host="0.0.0.0", port=62000, protocol=None) -> None:
+    def __init__(
+        self: "PickleRpcServer",
+        host: str = "0.0.0.0",
+        port: int = 62000,
+        protocol: int | None = None,
+    ) -> None:
         """Prepare a PickleRpcServer instance for use.
 
         Args:
@@ -29,7 +34,7 @@ class PickleRpcServer:
         self.svr_protocol = protocol
         self.svr_running = False
 
-    def __str__(self) -> str:
+    def __str__(self: "PickleRpcServer") -> str:
         """Displays detailed information with str()."""
         return "{} Details\n{}\nExternal Methods\n{}".format(
             self.__class__.__name__,
@@ -38,7 +43,7 @@ class PickleRpcServer:
         )
 
     @property
-    def _dict(self):
+    def _dict(self: "PickleRpcServer") -> dict[str, Callable]:
         """Dictionary of non-protected properties."""
         return {
             k: getattr(self, k)
@@ -47,26 +52,28 @@ class PickleRpcServer:
         }
 
     @property
-    def _ext_methods(self):
-        """List of methods that should be externally accessible (public, and not
-        run()).
-        """
+    def _ext_methods(self: "PickleRpcServer") -> list[tuple[str, str]]:
+        """List of methods that should be externally accessible."""
         return [
             (i, getattr(self, i).__doc__)
             for i in dir(self)
             if i not in ["run"] and not i.startswith("_") and callable(getattr(self, i))
         ]
 
-    def _get_result(self, command=None, args=None, kwargs=None):
+    def _get_result(
+        self: "PickleRpcServer",
+        command: str | None = None,
+        args: tuple[Any, ...] | None = None,
+        kwargs: dict[str, Any] | None = None,
+    ) -> Any:  # noqa: ANN401
         """Get a result from a local method.
 
         Args:
-        ----
-            command (str): Method name to call.
-            args (tuple): Tuple of positional arguments.
-            kwargs (dict): Dict of keyword arguments.
+            command: Method name to call.
+            args: Tuple of positional arguments.
+            kwargs: Dict of keyword arguments.
 
-        Returns (object):
+        Returns:
             Returns whatever the method returns, or an exception object if an
             exception occurs.
         """
@@ -84,12 +91,12 @@ class PickleRpcServer:
             LOG.error("ERROR getting attribute %s", command, exc_info=True)
             return error
 
-    def run(self, timeout=None):
+    def run(self: "PickleRpcServer", timeout: int | None = None) -> None:
         """Run the server.
 
         Args:
         ----
-            timeout (int): Number of seconds to run for. Defaults to None (
+            timeout: Number of seconds to run for. Defaults to None (
                 run indefinitely).
         """
         LOG.debug("Running %r with timeout=%r", self, timeout)
@@ -98,6 +105,7 @@ class PickleRpcServer:
         stop_time = time.time() + timeout if timeout else None
 
         def stopper():
+            """Stop the thread when expected."""
             return bool(time.time() < stop_time) if timeout else False
 
         # Open the socket for use.
