@@ -53,4 +53,4 @@ dir(client.ping())
 
 All data interchange between the targets is handled via Pickle, so any data type that can be pickled, can be passed back and forth. Exception objects passed back are detected and raised, while data is returned.
 
-PickleRPC works with Python 2.7 and 3.6.
+PickleRPC works with Python 3.10 and up.
